@@ -64,7 +64,7 @@ void setup(void) {
 void loop(void) {
   
   decodedMsg=Firebase.getString("Lamp/Dot_string");
-  wait=Firebase.getInt("Lamp/Dot_speed");
+   wait=(Firebase.getString("Lamp/Dot_speed")).toInt();
   for ( int i = 0 ; i < width * decodedMsg.length() + matrix.width() - 1 - spacer+1; i++ ) {
     
     if (refresh==1) i=0;
