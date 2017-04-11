@@ -12,118 +12,61 @@ GPIO0-D3        -> LOAD
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Max72xxPanel.h>
+#include <FirebaseArduino.h>
 
-#define SSID "Microsek-WIFI"                      // insert your SSID
-#define PASS "0810243789"                    // insert your password
-// ******************* String form to sent to the client-browser ************************************
-String form =
-  "<p>"
-  "<center>"
-  "<h1>Microsek ESP8266 ควมคุมการแสดงผมของ LED - DOT Matrix ผ่านเว็บ </h1>"
-  "<form action='msg'><p>ใส่ข้อความ <input type='text' name='msg' size=100 autofocus> <input type='submit' value='Submit'></form>"
-  "</center>";
+#define WIFI_SSID     "?????????"
+#define WIFI_PASSWORD "?????????"
+#define FIREBASE_HOST "?????????"
+#define FIREBASE_AUTH "?????????"
 
-ESP8266WebServer server(80);                             // HTTP server will listen at port 80
 long period;
 int offset=1,refresh=0;
 int pinCS = 0; // Attach CS to this pin, DIN to MOSI and CLK to SCK (cf http://arduino.cc/en/Reference/SPI )
-int numberOfHorizontalDisplays = 8;
+int numberOfHorizontalDisplays = 4;
 int numberOfVerticalDisplays = 1;
 String decodedMsg;
 Max72xxPanel matrix = Max72xxPanel(pinCS, numberOfHorizontalDisplays, numberOfVerticalDisplays);
 
-String tape = "Arduino";
-int wait = 250; // In milliseconds
+int wait = 10; // In milliseconds
 
-int spacer = 2;
+int spacer = 1;
 int width = 5 + spacer; // The font width is 5 pixels
 
-/*
-  handles the messages coming from the webbrowser, restores a few special characters and 
-  constructs the strings that can be sent to the oled display
-*/
-void handle_msg() {
-                        
-  matrix.fillScreen(LOW);
-  server.send(200, "text/html", form);    // Send same page so they can send another msg
-  refresh=1;
-  // Display msg on Oled
-  String msg = server.arg("msg");
-  Serial.println(msg);
-  decodedMsg = msg;
-  // Restore special characters that are misformed to %char by the client browser
-  decodedMsg.replace("+", " ");      
-  decodedMsg.replace("%21", "!");  
-  decodedMsg.replace("%22", "");  
-  decodedMsg.replace("%23", "#");
-  decodedMsg.replace("%24", "$");
-  decodedMsg.replace("%25", "%");  
-  decodedMsg.replace("%26", "&");
-  decodedMsg.replace("%27", "'");  
-  decodedMsg.replace("%28", "(");
-  decodedMsg.replace("%29", ")");
-  decodedMsg.replace("%2A", "*");
-  decodedMsg.replace("%2B", "+");  
-  decodedMsg.replace("%2C", ",");  
-  decodedMsg.replace("%2F", "/");   
-  decodedMsg.replace("%3A", ":");    
-  decodedMsg.replace("%3B", ";");  
-  decodedMsg.replace("%3C", "<");  
-  decodedMsg.replace("%3D", "=");  
-  decodedMsg.replace("%3E", ">");
-  decodedMsg.replace("%3F", "?");  
-  decodedMsg.replace("%40", "@"); 
-  //Serial.println(decodedMsg);                   // print original string to monitor
- 
- 
-    
-  //Serial.println(' ');                          // new line in monitor
-}
 
 void setup(void) {
-matrix.setIntensity(10); // Use a value between 0 and 15 for brightness
+  
+  Serial.begin(9600);
+  Serial.println(WiFi.localIP());
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("connecting");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.println();
+  Serial.print("connected: ");
+  Serial.println(WiFi.localIP());
+  
+  Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);  
+  matrix.setIntensity(10); // Use a value between 0 and 15 for brightness
 
-    matrix.setRotation(0, 1);    // The first display is position upside down
+  matrix.setRotation(0, 1);    // The first display is position upside down
   matrix.setRotation(1, 1);    // The same hold for the last display
-    matrix.setRotation(2, 1);    // The first display is position upside down
+  matrix.setRotation(2, 1);    // The first display is position upside down
   matrix.setRotation(3, 1);    // The same hold for the last display
 
-//ESP.wdtDisable();                               // used to debug, disable wachdog timer, 
-  Serial.begin(115200);                           // full speed to monitor
-                               
-  WiFi.begin(SSID, PASS);                         // Connect to WiFi network
-  while (WiFi.status() != WL_CONNECTED) {         // Wait for connection
-    delay(500);
-    Serial.print(".");
-  }
-  // Set up the endpoints for HTTP server,  Endpoints can be written as inline functions:
-  server.on("/", []() {
-    server.send(200, "text/html", form);
-  });
-  server.on("/msg", handle_msg);                  // And as regular external functions:
-  server.begin();                                 // Start the server 
-
-
-  Serial.print("SSID : ");                        // prints SSID in monitor
-  Serial.println(SSID);                           // to monitor             
- 
-  char result[16];
-  sprintf(result, "%3d.%3d.%1d.%3d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
-  Serial.println();
-  Serial.println(result);
-  decodedMsg = result;
+  decodedMsg = "Connect wifi";
   Serial.println("WebServer ready!   ");
-
-  Serial.println(WiFi.localIP());                 // Serial monitor prints localIP
-  Serial.print(analogRead(A0));
-  
+ 
 }
 
 
 void loop(void) {
-
-  for ( int i = 0 ; i < width * decodedMsg.length() + matrix.width() - 1 - spacer; i++ ) {
-    server.handleClient();                        // checks for incoming messages
+  
+  decodedMsg=Firebase.getString("Lamp/Dot_string");
+  wait=Firebase.getInt("Lamp/Dot_speed");
+  for ( int i = 0 ; i < width * decodedMsg.length() + matrix.width() - 1 - spacer+1; i++ ) {
+    
     if (refresh==1) i=0;
     refresh=0;
     matrix.fillScreen(LOW);
@@ -146,5 +89,4 @@ void loop(void) {
     delay(wait);
   }
 }
-
 
